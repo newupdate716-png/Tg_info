@@ -2,7 +2,7 @@ import os
 import asyncio
 import requests
 import re
-from flask import Flask, jsonify
+from flask import Flask, jsonify, request
 from telethon import TelegramClient, functions, types
 from telethon.sessions import StringSession
 from telethon.tl.functions.users import GetFullUserRequest
@@ -20,7 +20,6 @@ API_URL = "https://devil.elementfx.com/api.php?key=DEVIL&type=tg_number&term="
 BASE_URL = "https://t.me/"
 
 # ================= TELETHON =================
-# একটি গ্লোবাল লুপ ব্যবহার করা হচ্ছে স্থায়িত্বের জন্য
 loop = asyncio.get_event_loop()
 client = TelegramClient(StringSession(SESSION), API_ID, API_HASH)
 
@@ -34,9 +33,18 @@ loop.run_until_complete(init())
 def clean_html(text):
     return re.sub("<.*?>", "", text).strip() if text else "N/A"
 
-# ================= ROUTE =================
-@app.route("/user/<path:username>")
-def user_data(username):
+# ================= MAIN ROUTE =================
+@app.route("/")
+def user_data():
+    # ইউজারনেম কুয়েরি প্যারামিটার থেকে নেওয়া হচ্ছে (?user=@username)
+    username = request.args.get('user')
+    
+    if not username:
+        return jsonify({
+            "success": False, 
+            "error": "Please provide a username. Usage: /?user=@username"
+        }), 400
+
     try:
         if not username.startswith("@"):
             username = "@" + username
@@ -45,7 +53,7 @@ def user_data(username):
         tg_url = BASE_URL + clean_username
 
         async def fetch_telegram_info():
-            # ১. এentity খুঁজে বের করা
+            # ১. এনটিটি খুঁজে বের করা
             entity = await client.get_entity(username)
             entity_id = entity.id
             
@@ -89,11 +97,11 @@ def user_data(username):
                     "linked_chat_id": full.full_chat.linked_chat_id
                 })
 
-            # ৩. প্রোফাইল পিকচার (Latest Photo)
+            # ৩. প্রোফাইল পিকচার চেক
             photo_path = await client.download_profile_photo(entity, file=bytes)
             data["has_profile_pic"] = True if photo_path else False
 
-            # ৪. External Number API (আপনার আগের লজিক)
+            # ৪. External Number API
             try:
                 num_res = requests.get(API_URL + str(entity_id), timeout=5).json()
                 if num_res.get("success"):
@@ -103,7 +111,7 @@ def user_data(username):
             except:
                 data["leaked_info"] = "API Timeout"
 
-            # ৫. Public Web Scraping (ইমেজ এবং মেম্বার স্ট্যাটাস এর জন্য)
+            # ৫. Public Web Scraping (ইমেজ লিঙ্কের জন্য)
             try:
                 web_res = requests.get(tg_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=5)
                 if web_res.status_code == 200:
@@ -128,12 +136,10 @@ def user_data(username):
     except Exception as e:
         return jsonify({
             "success": False,
-            "error": str(e),
-            "tip": "Make sure the username is correct and the bot has access."
+            "error": str(e)
         }), 500
 
 # ================= RUN =================
 if __name__ == "__main__":
-    # Render বা Heroku এর জন্য পোর্ট সেটআপ
     port = int(os.environ.get("PORT", 8000))
     app.run(host="0.0.0.0", port=port, debug=False)
