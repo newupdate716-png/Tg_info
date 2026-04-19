@@ -7,9 +7,9 @@ import os
 
 app = Flask(__name__)
 
-# ✅ ENV থেকে নাও
-api_id = int(os.getenv("34417001"))
-api_hash = os.getenv("6ba9adc5da3f0f9f7397609ebfb90693")
+# ✅ Correct ENV
+api_id = int(os.getenv("API_ID"))
+api_hash = os.getenv("API_HASH")
 session_str = os.getenv("SESSION")
 
 @app.route("/")
