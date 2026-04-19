@@ -7,17 +7,16 @@ import os
 
 app = Flask(__name__)
 
+# ✅ ENV থেকে নাও
 api_id = int(os.getenv("34417001"))
 api_hash = os.getenv("6ba9adc5da3f0f9f7397609ebfb90693")
 session_str = os.getenv("SESSION")
-
 
 @app.route("/")
 def home():
     return "API Running ✅"
 
-
-@app.route("/tg", methods=["GET"])
+@app.route("/tg")
 def tg_lookup():
     username = request.args.get("u", "").replace("@", "").strip()
 
@@ -25,7 +24,6 @@ def tg_lookup():
         return jsonify({"error": "Username missing"})
 
     try:
-        # 🔥 প্রতি request এ নতুন client
         with TelegramClient(StringSession(session_str), api_id, api_hash) as client:
 
             entity = client.get_entity(username)
@@ -37,12 +35,10 @@ def tg_lookup():
                 "verified": getattr(entity, "verified", False),
             }
 
-            # user details
             if entity.__class__.__name__ == "User":
                 full = client(GetFullUserRequest(entity.id))
                 data["bio"] = full.full_user.about
 
-            # channel details
             if entity.__class__.__name__ == "Channel":
                 full = client(GetFullChannelRequest(entity))
                 data["members"] = full.full_chat.participants_count
